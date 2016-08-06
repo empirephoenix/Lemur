@@ -11,7 +11,18 @@ buildscript {
     }
 }
 
+apply plugin: "sonar-runner"
 apply plugin: 'java'
+
+uploadArchives {
+	repositories {
+		mavenDeployer {
+			repository(url: "$targetRepository/releases") {
+				authentication(userName: targetRepository_user, password: targetRepository_password)
+			}
+		}
+	}
+}
 
 version='1.8.2-SNAPSHOT'
 
