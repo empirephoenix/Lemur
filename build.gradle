@@ -14,16 +14,6 @@ buildscript {
 apply plugin: "sonar-runner"
 apply plugin: 'java'
 
-uploadArchives {
-	repositories {
-		mavenDeployer {
-			repository(url: "$targetRepository/releases") {
-				authentication(userName: targetRepository_user, password: targetRepository_password)
-			}
-		}
-	}
-}
-
 version='1.8.2-SNAPSHOT'
 
 ext.jmeVersion='[3.1,)' // but must be alpha4 or better
@@ -60,7 +50,17 @@ compileJava.doLast {
 configure(allprojects.findAll {it.name != 'extensions'}) {
 
     apply plugin: 'maven' // for installing to maven local
-
+	
+uploadArchives {
+	repositories {
+		mavenDeployer {
+			repository(url: "$targetRepository/releases") {
+				authentication(userName: targetRepository_user, password: targetRepository_password)
+			}
+		}
+	}
+}
+	
     // Common group ID for all projects here
     group='com.simsilica'
 
