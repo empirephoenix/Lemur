@@ -69,7 +69,7 @@ public abstract class BasePickState extends BaseAppState
     protected BasePickState() {
     }
 
-    protected final PickEventSession getSession() {
+    public final PickEventSession getSession() {
         return session;
     }
 

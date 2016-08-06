@@ -98,6 +98,10 @@ public class MouseAppState extends BasePickState {
             evt.setConsumed();
         }
     }
+    
+    public void mouseClick(MouseButtonEvent evt,int x, int y){
+    	getSession().buttonEvent(evt.getButtonIndex(), x, y, evt.isPressed());
+    }
 
     protected class MouseObserver extends DefaultRawInputListener {
         @Override

@@ -12,6 +12,7 @@ buildscript {
 }
 
 apply plugin: 'java'
+apply plugin: 'eclipse'
 
 version='1.8.2-SNAPSHOT'
 
