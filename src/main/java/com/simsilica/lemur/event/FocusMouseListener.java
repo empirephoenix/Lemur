@@ -53,10 +53,15 @@ public class FocusMouseListener extends DefaultMouseListener {
     }
 
     @Override
-    protected void click( MouseButtonEvent event, Spatial target, Spatial capture ) {
-        if( capture == null || capture == target ) {
+    public void mouseEntered(MouseMotionEvent event, Spatial target, Spatial capture) {
+    	if( capture == null || capture == target ) {
             GuiGlobals.getInstance().requestFocus(target);
         }
+    }
+    
+    @Override
+    public void mouseExited(MouseMotionEvent event, Spatial target, Spatial capture) {
+    	GuiGlobals.getInstance().requestFocus(null);
     }
 }
 
