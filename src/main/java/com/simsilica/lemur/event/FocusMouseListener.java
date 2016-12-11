@@ -38,30 +38,50 @@ import com.jme3.input.event.*;
 import com.jme3.scene.*;
 import com.simsilica.lemur.GuiGlobals;
 
-
 /**
- *  MouseListener implementation that will automatically tranfer
- *  focus to a GUI element if it is clicked.
+ * MouseListener implementation that will automatically tranfer focus to a GUI
+ * element if it is clicked.
  *
- *  @author    Paul Speed
+ * @author Paul Speed
  */
 public class FocusMouseListener extends DefaultMouseListener {
+	boolean mode2D = false;
 
-    public static final FocusMouseListener INSTANCE = new FocusMouseListener();
+	public void setMode2D(boolean mode2d) {
+		mode2D = mode2d;
+	}
 
-    protected FocusMouseListener() {
-    }
+	public boolean getMode2D() {
+		return mode2D;
+	}
 
-    @Override
-    public void mouseEntered(MouseMotionEvent event, Spatial target, Spatial capture) {
-    	if( capture == null || capture == target ) {
-            GuiGlobals.getInstance().requestFocus(target);
-        }
-    }
-    
-    @Override
-    public void mouseExited(MouseMotionEvent event, Spatial target, Spatial capture) {
-    	GuiGlobals.getInstance().requestFocus(null);
-    }
+	public static final FocusMouseListener INSTANCE = new FocusMouseListener();
+
+	protected FocusMouseListener() {
+	}
+
+	@Override
+	protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
+		if (mode2D) {
+			if (capture == null || capture == target) {
+				GuiGlobals.getInstance().requestFocus(target);
+			}
+		}
+	}
+
+	@Override
+	public void mouseEntered(MouseMotionEvent event, Spatial target, Spatial capture) {
+		if (!mode2D) {
+			if (capture == null || capture == target) {
+				GuiGlobals.getInstance().requestFocus(target);
+			}
+		}
+	}
+
+	@Override
+	public void mouseExited(MouseMotionEvent event, Spatial target, Spatial capture) {
+		if (!mode2D) {
+			GuiGlobals.getInstance().requestFocus(null);
+		}
+	}
 }
-
