@@ -51,6 +51,7 @@ import com.simsilica.lemur.event.BaseAppState;
 public class FocusManagerState extends BaseAppState {
 
     private Spatial focus;
+    private FocusNavigationState focusNavigationState;
     private List<Spatial> focusHierarchy = Collections.emptyList();
 
     public FocusManagerState() {
@@ -69,10 +70,25 @@ public class FocusManagerState extends BaseAppState {
         return null;
     }
 
+    public void setFocusNavigationState( FocusNavigationState focusNavigationState ) {
+        this.focusNavigationState = focusNavigationState;
+    } 
+
+    public FocusNavigationState getFocusNavigationState() {
+        return focusNavigationState;
+    }
+
     public void setFocus( Spatial focus ) {
+
+        if( getFocusNavigationState() != null ) {
+            // See if the specified spatial is really a container and if we should
+            // instead drill into its default child
+            focus = getFocusNavigationState().getDefaultFocus(focus);
+        }
+    
         if( this.focus == focus )
             return;
-       
+
         this.focus = focus;
         if( isEnabled() ) {
             updateFocusHierarchy();
@@ -91,6 +107,35 @@ public class FocusManagerState extends BaseAppState {
     protected void cleanup( Application app ) {
     }
 
+    @Override 
+    public void update( float tpf ) {
+        // Check if the focus hierarchy is still valid and connected.
+        // JME provides no way for us to detect when a spatial has become
+        // detached from the scene graph.  You can't even really do it
+        // as part of a control or update that checks for bounds refresh
+        // or something because once the spatial is detached it won't receive
+        // updates anymore.
+        // Our only recourse is to confirm the hierarchy is still connected.
+        // We have two approaches to this:
+        // 1) trace all the way back to a known set of roots to see if it
+        //    is still connected to a full scene graph.
+        // 2) simply check that the focus hierarchy is as connected as it was when
+        //    the focus was set originally.
+        //
+        // The problem with (1) is that we'd have to manage a bunch of scene roots
+        // and applications would have to remember to set them.  Not all focus hierarchies
+        // will leave in the GUI node or regular scene root.
+        //
+        // The problem with (2) is that if the application sets an unconnected focus
+        // to begin with, well we can't tell that it's not connected.  However, in this
+        // case I think it's better to trust the app.  There is always the chance that
+        // they set the focus to something unattached on purpose and anyway we otherwise
+        // relinquish them from additional root-management burden.
+        if( !isConnected(focusHierarchy) ) {
+            setFocus(null);
+        }
+    }
+
     protected List<Spatial> getHierarchy( Spatial s ) {
         if( s == null ) {
             return Collections.emptyList();
@@ -100,6 +145,32 @@ public class FocusManagerState extends BaseAppState {
             result.add(0, s);
         }
         return result;
+    }
+    
+    /**
+     *  Returns true if the specified hierarchy list is still 
+     *  as fully connected as it was when original set, meaning that all spatials 
+     *  except the first still have valid parents that are also the previous
+     *  item in the list.
+     */
+    protected boolean isConnected( List<Spatial> hierarchy ) {
+        if( hierarchy.size() < 2 ) {
+            // Can't tell otherwise
+            return true;
+        }
+        
+        // The first one will be whatever root there was when focus
+        // was set.  Hopefully the user hasn't set an unconnected item
+        // as focus in the first place.
+        Spatial last = hierarchy.get(0);
+        for( int i = 1; i < hierarchy.size(); i++ ) {
+            Spatial child = hierarchy.get(i);
+            if( child.getParent() != last ) {
+                return false;
+            }
+            last = child;
+        }
+        return true;
     }
 
     protected void updateFocusHierarchy() {
@@ -133,7 +204,7 @@ public class FocusManagerState extends BaseAppState {
             }
         }
         
-        // Tell the old hiearchy that focus is gone
+        // Tell the old hierarchy that focus is gone
         for( int i = lca + 1; i < oldHierarchy.size(); i++ ) {
             FocusTarget target = findFocusTarget(oldHierarchy.get(i));
             if( target != null ) {
@@ -149,7 +220,7 @@ public class FocusManagerState extends BaseAppState {
             }
         }
         
-        // Cache the hiearchy for later
+        // Cache the hierarchy for later
         focusHierarchy = newHierarchy;
     }  
 
@@ -167,7 +238,7 @@ public class FocusManagerState extends BaseAppState {
 
     @Override
     protected void disable() {
-        // Let the whole existing focus hiearchy know
+        // Let the whole existing focus hierarchy know
         // we're unfocused. 
         for( Spatial s : focusHierarchy ) {
             FocusTarget target = findFocusTarget(s);

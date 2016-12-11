@@ -34,7 +34,24 @@
 
 package com.simsilica.lemur;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
+import com.jme3.input.event.MouseButtonEvent;
+import com.jme3.input.event.MouseMotionEvent;
+import com.jme3.math.ColorRGBA;
+import com.jme3.scene.Spatial;
+
+import com.simsilica.lemur.core.CommandMap;
+import com.simsilica.lemur.core.GuiControl;
+import com.simsilica.lemur.component.QuadBackgroundComponent;
+import com.simsilica.lemur.focus.FocusChangeEvent;
+import com.simsilica.lemur.focus.FocusChangeListener;
+import com.simsilica.lemur.focus.FocusNavigationFunctions;
+import com.simsilica.lemur.input.FunctionId;
+import com.simsilica.lemur.input.InputState;
+import com.simsilica.lemur.input.StateFunctionListener;
 import com.simsilica.lemur.style.StyleDefaults;
 import com.simsilica.lemur.style.Attributes;
 import com.simsilica.lemur.style.ElementId;
@@ -43,16 +60,6 @@ import com.simsilica.lemur.style.Styles;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.FocusMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
-import com.jme3.input.event.MouseButtonEvent;
-import com.jme3.input.event.MouseMotionEvent;
-import com.jme3.math.ColorRGBA;
-import com.jme3.scene.Spatial;
-
-import com.simsilica.lemur.core.CommandMap;
-import com.simsilica.lemur.component.QuadBackgroundComponent;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -70,15 +77,20 @@ public class Button extends Label {
     public static final String EFFECT_CLICK = "click";
     public static final String EFFECT_ACTIVATE = "activate";
     public static final String EFFECT_DEACTIVATE = "deactivate";
+    public static final String EFFECT_FOCUS = "focus";
+    public static final String EFFECT_UNFOCUS = "unfocus";
     
-    public enum ButtonAction { Down, Up, Click, HighlightOn, HighlightOff };
+    public enum ButtonAction { Down, Up, Click, HighlightOn, HighlightOff, FocusGained, FocusLost };
 
     private boolean enabled = true;
     private ColorRGBA color;
     private ColorRGBA shadowColor;
     private ColorRGBA highlightColor;
     private ColorRGBA highlightShadowColor;
+    private ColorRGBA focusColor;
+    private ColorRGBA focusShadowColor;
     private boolean highlightOn;
+    private boolean focusOn;
     private boolean pressed;
     private CommandMap<Button, ButtonAction> commandMap
                                                 = new CommandMap<Button, ButtonAction>(this);
@@ -103,6 +115,8 @@ public class Button extends Label {
         super(s, false, elementId, style);
 
         addControl(new MouseEventControl(FocusMouseListener.INSTANCE, new ButtonMouseHandler()));
+        getControl(GuiControl.class).addFocusChangeListener(new FocusObserver());
+        getControl(GuiControl.class).setFocusable(true);
 
         Styles styles = GuiGlobals.getInstance().getStyles();
         if( applyStyles ) {
@@ -114,6 +128,7 @@ public class Button extends Label {
     public static void initializeDefaultStyles( Attributes attrs ) {
         attrs.set("background", new QuadBackgroundComponent(new ColorRGBA(0,0,0,0)), false);
         attrs.set("highlightColor", ColorRGBA.Yellow, false);
+        attrs.set("focusColor", ColorRGBA.Green, false);
         attrs.set("shadowColor", new ColorRGBA(0, 0, 0, 0.5f), false);
     }
 
@@ -175,6 +190,9 @@ public class Button extends Label {
     @StyleAttribute(value="highlightColor", lookupDefault=false)
     public void setHighlightColor( ColorRGBA color ) {
         this.highlightColor = color;
+        if( isHighlightOn() ) {
+            resetColors();
+        }
     }
 
     public ColorRGBA getHighlightColor() {
@@ -184,11 +202,39 @@ public class Button extends Label {
     @StyleAttribute(value="highlightShadowColor", lookupDefault=false)
     public void setHighlightShadowColor( ColorRGBA color ) {
         this.highlightShadowColor = color;
+        if( isHighlightOn() ) {
+            resetColors();
+        }
     }
 
     public ColorRGBA getHighlightShadowColor() {
         return highlightShadowColor;
     }
+
+    @StyleAttribute(value="focusColor", lookupDefault=false)
+    public void setFocusColor( ColorRGBA color ) {
+        this.focusColor = color;
+        if( isFocusHighlightOn() ) {
+            resetColors();
+        }
+    }
+
+    public ColorRGBA getFocusColor() {
+        return focusColor;
+    }
+
+    @StyleAttribute(value="focusShadowColor", lookupDefault=false)
+    public void setFocusShadowColor( ColorRGBA color ) {
+        this.focusShadowColor = color;
+        if( isFocusHighlightOn() ) {
+            resetColors();
+        }
+    }
+
+    public ColorRGBA getFocusShadowColor() {
+        return focusShadowColor;
+    }
+    
 
     public void setEnabled( boolean b ) {
         if( this.enabled == b )
@@ -208,17 +254,84 @@ public class Button extends Label {
         return highlightOn;
     }
 
+    public boolean isFocusHighlightOn() {
+        return focusOn;
+    }
+
+    public boolean isFocused() {
+        return getControl(GuiControl.class).isFocused();
+    }
+
     protected void showHighlight( boolean f ) {
         highlightOn = f;
-        if( f ) {
+        resetColors();
+    }
+
+    protected void showFocus( boolean f ) {
+        focusOn = f;
+        resetColors();
+    }
+ 
+    private static ColorRGBA mix( ColorRGBA c1, ColorRGBA c2 ) {
+        if( c1 == null && c2 == null ) {
+            return null;
+        }
+        if( c1 == null ) {
+            return c2;
+        }
+        if( c2 == null ) {
+            return c1;
+        }
+        return c1.clone().interpolateLocal(c2, 0.5f);
+    }
+    
+    protected void resetColors() {
+        if( focusOn && highlightOn ) {
+            // Mix them
+            ColorRGBA color = mix(getHighlightColor(), getFocusColor());
+            if( color != null ) {
+                super.setColor(color);
+            }
+            ColorRGBA shadow = mix(getHighlightShadowColor(), getFocusShadowColor());
+            if( shadow != null ) {
+                super.setShadowColor(shadow);
+            } 
+        } else if( highlightOn ) {
             if( getHighlightColor() != null )
                 super.setColor(getHighlightColor());
             if( getHighlightShadowColor() != null )
                 super.setShadowColor(getHighlightShadowColor());
+        } else if( focusOn ) {
+            if( getFocusColor() != null )
+                super.setColor(getFocusColor());
+            if( getFocusShadowColor() != null )
+                super.setShadowColor(getFocusShadowColor());
         } else {
+            // Just the plain color
             super.setColor(getColor());
             super.setShadowColor(getShadowColor());
         }
+    }
+
+    protected void setPressed( boolean f ) {
+        if( pressed == f ) {
+            return;
+        }
+        this.pressed = f;
+        if( pressed ) {
+            commandMap.runCommands(ButtonAction.Down);
+            runEffect(EFFECT_PRESS);
+        } else {
+            commandMap.runCommands(ButtonAction.Up);
+            runEffect(EFFECT_RELEASE);
+        }
+    }
+
+    protected void runClick() {
+        if( !isEnabled() )
+            return;
+        commandMap.runCommands(ButtonAction.Click);
+        runEffect(EFFECT_CLICK);
     }
 
     @Override
@@ -226,14 +339,51 @@ public class Button extends Label {
         return getClass().getName() + "[text=" + getText() + ", color=" + getColor() + ", elementId=" + getElementId() + "]";
     }
 
+    protected class FocusObserver implements FocusChangeListener, StateFunctionListener {
+        
+        public void focusGained( FocusChangeEvent event ) {
+            if( !isEnabled() ) {
+                return;
+            }
+            showFocus(true);
+            commandMap.runCommands(ButtonAction.FocusGained);
+            runEffect(EFFECT_FOCUS);
+            
+            GuiGlobals.getInstance().getInputMapper().addStateListener(this, FocusNavigationFunctions.F_ACTIVATE);
+        }
+        
+        public void focusLost( FocusChangeEvent event ) {
+            if( !isFocusHighlightOn() ) {
+                // No reason to run the 'off' effects if we were never on.
+                return;
+            }
+            GuiGlobals.getInstance().getInputMapper().removeStateListener(this, FocusNavigationFunctions.F_ACTIVATE);
+            
+            // If the button is pressed then unpress it
+            if( isPressed() ) {
+                setPressed(false);
+            }
+            
+            showFocus(false);
+            commandMap.runCommands(ButtonAction.FocusLost);
+            runEffect(EFFECT_UNFOCUS);
+        }
+        
+        public void valueChanged( FunctionId func, InputState value, double tpf ) {
+            if( pressed && value == InputState.Off ) {
+                // Do click processing... the mouse does click processing before
+                // up processing so we will too
+                runClick();
+            }
+            // Only mapped to one function so no need to distinguish
+            setPressed(isEnabled() && value == InputState.Positive);
+        }
+    }
+
     protected class ButtonMouseHandler extends DefaultMouseListener {
 
         @Override
         protected void click( MouseButtonEvent event, Spatial target, Spatial capture ) {
-            if( !isEnabled() )
-                return;
-            commandMap.runCommands(ButtonAction.Click);
-            runEffect(EFFECT_CLICK);
         }
 
         @Override
@@ -247,15 +397,17 @@ public class Button extends Label {
             if( !isEnabled() )
                 return;                                            
 
-            pressed = event.isPressed();
             if( event.isPressed() ) {
-                commandMap.runCommands(ButtonAction.Down);
-                runEffect(EFFECT_PRESS);
-            } else {
+                setPressed(event.isPressed());
+            } else if( isPressed() ) {
+                // Only run the up processing if we were already pressed
+                // This also handles the case where we weren't enabled before
+                // but are now, etc.
+                
                 if( target == capture ) {
                     // Then we are still over the button and we should run the
                     // click
-                    click(event, target, capture);
+                    runClick();
                 }
                 // If we run the up without checking properly then we
                 // potentially get up events with no down event.  This messes
@@ -263,8 +415,7 @@ public class Button extends Label {
                 // down and no ups without downs.
                 // So, any time the capture is us then we will run, else not
                 if( capture == Button.this ) {
-                    commandMap.runCommands(ButtonAction.Up);
-                    runEffect(EFFECT_RELEASE);
+                    setPressed(false);
                 }
             }
         }

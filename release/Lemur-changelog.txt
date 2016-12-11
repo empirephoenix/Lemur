@@ -1,3 +1,88 @@
+Lemur 1.10.1 (unreleased)
+-------------
+* Added a proper toString() method to the LayerComparator.
+* Added a 'debug mode' to the PickEventSession which lets a caller selectively
+    raise the logging level for a particular instance.
+* Removed a leftover unused 'index' field in GuiControl.
+* Added support for GuiUpdateListeners to GuiControl so that things like
+    child GuiComponents can hook into the controlUpdate() without having
+    to create another full control themselves.
+* Modified GuiControl to lazily instantiate its listener lists.
+* Added a TextField(DocumentModel) convenience constructor.    
+* Added a DocumentModel.createCaratReference() method that returns a versioned
+    reference for the carat position. 
+* Fixed TextEntryComponent to be more reactive to external DocumentModel changes
+    and it now uses that even for its own internal changes to the document.
+* Breaking change: DocumentModel has been moved to the com.simsilica.lemur.text
+    package and is now an interface.  Make sure any of your classes that use
+    DocumentModel directly import it from the new location.  If you instantiate
+    a DocumentModel directly then now you will instantiate DefaultDocumentModel
+    instead.  Sorry.  It needed to be done and was only going to get worse
+    the longer I waited.    
+* Added a DocumentModelFilter class that is a DocumentModel that wraps other
+    DocumentModels to provide filtering and transformation.  Callers can do simple
+    filtering with Guava Functions and Subclasses can override the methods to 
+    provide more advanced transformation and input filtering.
+* Added a TextFilters class with a bunch of default input and output implementations
+    for commonly used things.
+* Refactored TextField a bit to make it easier to subclass and override the model
+    or TextEntryComponent.
+* Added a PasswordField that is auto-wired with some useful DocumentModelFilter
+    behavior suitable for password fields.  Includes stylable attributes for
+    setting the output character and allowed input characters. 
+* Fixed a bug where focus wasn't cleared for objects removed from the scene
+    graph.  The fix is a bit of a hack but there really isn't any other way.
+    This fixes issues #42 and #28.
+* Modified the MouseAppState to pass along the scroll wheel information to the
+    PickEventSessions.  PickEventSession was modified to then pass on the appropriate
+    scroll values and deltas to the MouseMotionEvents and CursorMotionEvents.
+    CursorMotionEvent was enhanced to have getScrollValue() and getScrollDelta()
+    methods.
+* Added an insert(String) method to DocumentModel and its implementations that
+    allows bulk-insertion of text instead of just one character at a time
+* Fixed GuiGlobals to not crash under certain circumstances if the build info isn't 
+    available.  Fixes issue #38
+    
+
+Lemur 1.9.1
+------------
+* Fixed a bug in RollupPanel.setContents(null) where removing the existing
+    contents was causing problems if the rollup panel was closed.
+* Fixed a code-spotted bug where setting a null layout would have caused an
+    NPE.
+* Added basic focus navigation support including simple default implementations
+    in the standard GUI elements.
+* Modified KeyAction to support SHIFT_DOWN in addition to CONTROL_DOWN.
+* Upated TextEntryComponent to hook up some standard keys to focus actions for
+    single line text fields.    
+    Tab = Next, Shift+Tab = Previous, Enter = Next, Up = Up, Down = Down.
+* Added a ModifiedKeyInputEvent that extends JME's normal KeyInputEvent to
+    provide modifier flags for alt, ctrl, shift, etc..  Modified the KeyInterceptorState
+    to wrap KeyInputEvents in this event for delivery to the listeners.  Listeners
+    that want the modifiers (unfortunately) must cast to the more specific
+    event class.  
+* Added a KeyModifiers class and moved the key modifier bit constants to it.
+* Modified SpringGridLayout to keep its children in a LinkedHashMap so that the
+    initial ordering is still available.
+* Made buttons "focusable" so that they can participate in focus navigation.
+* Added a focusColor and focusShadowColor to Button to indicate focus.
+* Added support for ButtonAction.FocusGained and ButtonAction.FocusLost button actions.
+* Added Button.EFFECT_FOCUS, Button.EFFECT_UNFOCUS effect triggers.
+* Fixed Button to update the active highlight color if it changes while the button
+    has highlighting on.
+* Consolidated pressed/released/click handling into the main Button class and
+    hooked up the focus activation event to pressed/released/click handling.
+* Added trace logging to InputMapper that logs the raw events received from JME.
+* Fixed a bug where Label's shadow text component wasn't picking up the max width
+    if set.    
+* Added method an AbstractCursorEvent.getLocation() convenience method for getting
+    the event location as a Vector2f.
+* Added a general PopupState for managing modal and non-modal popups that can be
+    closed by simply clicking outside of the popped up panel (or optionally block
+    those events).
+* Added PopupState as a built-in state in GuiGlobals.
+    
+
 Lemur 1.8.2
 ------------
 * Fixed a typo in the MathApi used by the style loader language.
@@ -6,6 +91,11 @@ Lemur 1.8.2
     if the button was disabled but highlight was on.
 * Fixed a bug in Tweens to support primitive arguments in the callMethods()
     tween.
+* Fixed a bug where the cursor of a text field would be invisible if the
+    alpha value had never been set.
+* Fixed a bug in QuadBackgroundComponent and TbtQuadBackgroundComponent
+    where the cached collision data wasn't being cleared on resize causing
+    mouse picking to fail if the objects increased in size.
 
 
 Lemur 1.8.1

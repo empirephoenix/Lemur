@@ -34,23 +34,26 @@
 
 package com.simsilica.lemur;
 
-import com.simsilica.lemur.style.StyleDefaults;
-import com.simsilica.lemur.style.Attributes;
-import com.simsilica.lemur.style.ElementId;
-import com.simsilica.lemur.style.StyleAttribute;
-import com.simsilica.lemur.style.Styles;
-import com.simsilica.lemur.event.KeyActionListener;
-import com.simsilica.lemur.event.KeyAction;
-import com.simsilica.lemur.event.FocusMouseListener;
-import com.simsilica.lemur.event.MouseEventControl;
-import com.simsilica.lemur.component.QuadBackgroundComponent;
-import com.simsilica.lemur.component.TextEntryComponent;
 import java.util.Map;
 
 import com.jme3.font.BitmapFont;
 import com.jme3.math.ColorRGBA;
 
+import com.simsilica.lemur.component.QuadBackgroundComponent;
+import com.simsilica.lemur.component.TextEntryComponent;
 import com.simsilica.lemur.core.GuiControl;
+import com.simsilica.lemur.event.KeyActionListener;
+import com.simsilica.lemur.event.KeyAction;
+import com.simsilica.lemur.event.FocusMouseListener;
+import com.simsilica.lemur.event.MouseEventControl;
+import com.simsilica.lemur.style.StyleDefaults;
+import com.simsilica.lemur.style.Attributes;
+import com.simsilica.lemur.style.ElementId;
+import com.simsilica.lemur.style.StyleAttribute;
+import com.simsilica.lemur.style.Styles;
+import com.simsilica.lemur.text.DefaultDocumentModel;
+import com.simsilica.lemur.text.DocumentModel;
+
 
 
 /**
@@ -67,19 +70,23 @@ public class TextField extends Panel {
     private TextEntryComponent text;
 
     public TextField( String text ) {
-        this(new DocumentModel(text), true, new ElementId(ELEMENT_ID), null);
+        this(new DefaultDocumentModel(text), true, new ElementId(ELEMENT_ID), null);
+    }
+
+    public TextField( DocumentModel model ) {
+        this(model, true, new ElementId(ELEMENT_ID), null);
     }
 
     public TextField( String text, String style ) {
-        this(new DocumentModel(text), true, new ElementId(ELEMENT_ID), style);
+        this(new DefaultDocumentModel(text), true, new ElementId(ELEMENT_ID), style);
     }
 
     public TextField( String text, ElementId elementId ) {
-        this(new DocumentModel(text), true, elementId, null);
+        this(new DefaultDocumentModel(text), true, elementId, null);
     }
     
     public TextField( String text, ElementId elementId, String style ) {
-        this(new DocumentModel(text), true, elementId, style);
+        this(new DefaultDocumentModel(text), true, elementId, style);
     }
 
     public TextField( DocumentModel model, String style ) {
@@ -95,16 +102,28 @@ public class TextField extends Panel {
                                                    LAYER_BACKGROUND,
                                                    LAYER_TEXT);
 
-        Styles styles = GuiGlobals.getInstance().getStyles();
-        BitmapFont font = styles.getAttributes(elementId.getId(), style).get("font", BitmapFont.class);
-        this.text = new TextEntryComponent(model, font);
-        getControl(GuiControl.class).setComponent(LAYER_TEXT, text);
+        setDocumentModel(model);
 
         addControl(new MouseEventControl(FocusMouseListener.INSTANCE));
 
         if( applyStyles ) {
+            Styles styles = GuiGlobals.getInstance().getStyles();
             styles.applyStyles(this, elementId.getId(), style);
         }
+    }
+
+    protected void setDocumentModel( DocumentModel model ) {
+        if( model == null ) {
+            return;
+        }
+        this.text = createTextEntryComponent(model);
+        getControl(GuiControl.class).setComponent(LAYER_TEXT, text);
+    }
+
+    protected TextEntryComponent createTextEntryComponent( DocumentModel model ) {
+        Styles styles = GuiGlobals.getInstance().getStyles();
+        BitmapFont font = styles.getAttributes(getElementId().getId(), getStyle()).get("font", BitmapFont.class);
+        return new TextEntryComponent(model, font);
     }
 
     @StyleDefaults(ELEMENT_ID)
@@ -205,6 +224,6 @@ public class TextField extends Panel {
     @Override
     public String toString() {
         return getClass().getName() + "[text=" + getText() + ", color=" + getColor() + ", elementId=" + getElementId() + "]";
-    }
+    }    
 }
 

@@ -88,6 +88,25 @@ public class CallMethodAction extends Action {
         return Button.class.isAssignableFrom(type)
                || Action.class.isAssignableFrom(type);
     }
+    
+    protected boolean isValidArgumentList( Class[] types ) {
+        if( log.isTraceEnabled() ) {
+            log.trace("isValidArgumentList(" + java.util.Arrays.asList(types) + ")");
+        }
+        for( Class c : types ) {
+            if( !isValidArgument(c) ) {
+                if( log.isTraceEnabled() ) {
+                    log.trace("isValidArgument(" + c + ") = false");
+                }
+                return false;
+            } else {
+                if( log.isTraceEnabled() ) {
+                    log.trace("isValidArgument(" + c + ") = true");
+                }
+            }
+        }
+        return true;
+    }
 
     protected Object toParm( Button source, Class type ) {
         if( Button.class.isAssignableFrom(type) ) {
@@ -97,7 +116,7 @@ public class CallMethodAction extends Action {
             return this;
         }
         return null;
-    }
+    }    
 
     protected void findMethod() {
         if( object == null || methodName == null ) {
@@ -106,7 +125,12 @@ public class CallMethodAction extends Action {
         // It's not a straight lookup because we support
         // protected methods and methods that take some arguments
         // like the action or the button.
-        Class type = object.getClass();        
+        Class type = object.getClass();
+        findMethod(type);
+    }        
+        
+    protected void findMethod( Class type ) {
+        log.trace("Finding method:" + methodName + " on:" + type);        
         for( Method m : type.getDeclaredMethods() ) {
             log.trace("Checking method:" + m); 
             if( !methodName.equals(m.getName()) ) {
@@ -116,10 +140,8 @@ public class CallMethodAction extends Action {
             if( parms.length > 2 ) {
                 continue;
             }
-            for( Class c : parms ) {
-                if( !isValidArgument(c) ) {
-                    continue;
-                }
+            if( !isValidArgumentList(parms) ) {
+                continue;
             }
  
             // Else it matches           
@@ -132,9 +154,12 @@ public class CallMethodAction extends Action {
             
             break;
         }
+        if( method == null && type != Object.class ) {
+            findMethod(type.getSuperclass());
+        } 
         log.trace("Found:" + method);        
         if( this.method == null ) {
-            throw new RuntimeException("Method not found for:" + methodName + " on type:" + object);
+            throw new RuntimeException("Method not found for:" + methodName + " on type:" + type);
         }        
     }    
     
@@ -168,7 +193,18 @@ public class CallMethodAction extends Action {
         }
         try {
             method.invoke(object, args);
-        } catch( IllegalAccessException | IllegalArgumentException | InvocationTargetException e ) {
+        } catch( IllegalArgumentException e ) {
+            // The JDK gives basically no info so it's up to us.
+            StringBuilder sb = new StringBuilder();
+            for( int i = 0; i < args.length; i++ ) {
+                if( sb.length() > 0 ) {
+                    sb.append(", ");
+                }
+                sb.append("(" + parmTypes[i] + ")");
+                sb.append(args[i]);
+            }
+            throw new RuntimeException("Error calling:" + method + " with parameters [" + sb + "]", e); 
+        } catch( IllegalAccessException | InvocationTargetException e ) {
             throw new RuntimeException("Error invoking action method:" + methodName, e);
         }
     }

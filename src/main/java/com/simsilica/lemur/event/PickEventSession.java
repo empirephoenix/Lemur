@@ -112,12 +112,52 @@ public class PickEventSession {
      */
     private Set<Spatial> delivered = new HashSet<Spatial>();
 
+    /**
+     *  An instance-based debug value that will turn on logging for a particular
+     *  instance... useful for debugging specific viewport pick sessions, etc..
+     */
+    private boolean debug;
+    
+    /**
+     *  Tracks the last scroll value so we can pass a proper delta in the events.
+     */
+    private int lastScroll = 0;
+     
+    
     public PickEventSession() {
     }
 
     protected PickEventSession( Map<Collidable, RootEntry> roots ) {
         this.roots.putAll(roots);
         this.rootList = null;
+    }
+
+    /**
+     *  Turns on extra debug logging.  This will cause all of the logging
+     *  that would normally be at trace level for any instance to be at debug
+     *  level just for _this_ instance.
+     */
+    public void setDebugOn( boolean f ) {
+        this.debug = f;
+    }
+ 
+    /**
+     *  Returns true if extra debug logging has been turned on.
+     */   
+    public boolean isDebugOn() {
+        return debug;
+    }
+
+    protected boolean isTraceEnabled() {
+        return debug || log.isTraceEnabled();
+    }
+    
+    protected void trace( String msg ) {
+        if( debug ) {
+            log.debug(msg);
+        } else if( log.isTraceEnabled() ) {
+            log.trace(msg);
+        }
     }
 
     /**
@@ -273,7 +313,7 @@ public class PickEventSession {
             }
             if( this.hitTarget.getControl(CursorEventControl.class) != null ) {
                 // Exiting
-                event1 = new CursorMotionEvent(viewport, hitTarget, cursor.x, cursor.y, cr);
+                event1 = new CursorMotionEvent(viewport, hitTarget, cursor.x, cursor.y, 0, 0, cr);
                 this.hitTarget.getControl(CursorEventControl.class).cursorExited(event1, hitTarget, capture);
             }
         }
@@ -290,7 +330,7 @@ public class PickEventSession {
             if( this.hitTarget.getControl(CursorEventControl.class) != null ) {
                 // Entering
                 if( event1 == null ) {
-                    event1 = new CursorMotionEvent(viewport, hitTarget, cursor.x, cursor.y, cr);
+                    event1 = new CursorMotionEvent(viewport, hitTarget, cursor.x, cursor.y, 0, 0, cr);
                 }
 
                 this.hitTarget.getControl(CursorEventControl.class).cursorEntered(event1, hitTarget, capture);
@@ -347,6 +387,11 @@ public class PickEventSession {
     }
 
     protected Ray getPickRay( RootEntry rootEntry, Vector2f cursor ) {
+    
+        if( isTraceEnabled() ) {
+            trace("getPickRay(" + rootEntry + ", " + cursor + ")");
+        }
+    
         Camera cam = rootEntry.viewport.getCamera();
 
         Ray result = rayCache.get(cam);
@@ -354,6 +399,7 @@ public class PickEventSession {
             return result;
 
         if( rootEntry.root instanceof Spatial && ((Spatial)rootEntry.root).getQueueBucket() == Bucket.Gui ) {
+            trace("Creating GuiBucket ray.");
             // Special case for Gui Bucket nodes since they are always in screen space
             result = new Ray(new Vector3f(cursor.x, cursor.y, 1000), new Vector3f(0, 0, -1));
         } else {
@@ -367,6 +413,9 @@ public class PickEventSession {
                 // we should technically clip perspective also.
                 Vector3f clickFar  = cam.getWorldCoordinates(cursor, 1);
                 Vector3f clickNear = cam.getWorldCoordinates(cursor, 0);
+                if( isTraceEnabled() ) {                
+                    trace("Creating Viewport ray, clickNear:" + clickNear + " clickFar:" + clickFar);
+                }
                 result = new Ray(clickNear, clickFar.subtractLocal(clickNear).normalizeLocal());
             } else {
                 result = null;
@@ -377,7 +426,24 @@ public class PickEventSession {
         return result;
     }
 
+    /**
+     *  Called when the cursor has moved.
+     */
     public boolean cursorMoved( int x, int y ) {
+        return cursorMoved(x, y, 0);
+    }
+
+    /**
+     *  Called when the cursor has moved in an environment where there is
+     *  also a separate scroll wheel or other scroll control.
+     */
+    public boolean cursorMoved( int x, int y, int scroll ) {
+        if( isTraceEnabled() ) {
+            trace("cursorMoved(" + x + ", " + y + ", scroll=" + scroll + ") capture:" + capture);
+        }
+
+        int scrollDelta = scroll - lastScroll;
+        lastScroll = scroll;
 
         Vector2f cursor = new Vector2f(x,y);
 
@@ -401,7 +467,7 @@ public class PickEventSession {
             // controls.
             boolean consumed = false;
             if( capture.getControl(MouseEventControl.class) != null ) {
-                event = new MouseMotionEvent((int)cursor.x, (int)cursor.y, 0, 0, 0, 0);
+                event = new MouseMotionEvent((int)cursor.x, (int)cursor.y, 0, 0, scroll, scrollDelta);
                 delivered.add(capture);
                 capture.getControl(MouseEventControl.class).mouseMoved(event, capture, capture);
                 if( event.isConsumed() ) {
@@ -437,7 +503,9 @@ public class PickEventSession {
                         cr = results.getClosestCollision();
                         results.clear();
                     }
-                    CursorMotionEvent cme = new CursorMotionEvent(captureRoot.viewport, capture, cursor.x, cursor.y, cr);
+                    CursorMotionEvent cme = new CursorMotionEvent(captureRoot.viewport, capture, 
+                                                                  cursor.x, cursor.y, scroll, scrollDelta, 
+                                                                  cr);
                     delivered.add(capture);
                     capture.getControl(CursorEventControl.class).cursorMoved(cme, capture, capture);
                     if( cme.isConsumed() ) {
@@ -455,8 +523,8 @@ public class PickEventSession {
             Camera cam = e.viewport.getCamera();
 
             Ray mouseRay = getPickRay(e, cursor);
-            if( log.isTraceEnabled() ) {
-                log.trace("Picking against:" + e + " with:" + mouseRay);
+            if( isTraceEnabled() ) {
+                trace("Picking against:" + e + " with:" + mouseRay);
             }
             if( mouseRay == null ) {
                 continue;
@@ -468,12 +536,12 @@ public class PickEventSession {
             if( count > 0 ) {
                 for( CollisionResult cr : results ) {
                     Geometry geom = cr.getGeometry();
-                    if( log.isTraceEnabled() ) {
-                        log.trace("Collision geometry:" + geom);
+                    if( isTraceEnabled() ) {
+                        trace("Collision geometry:" + geom);
                     }
                     Spatial hit = findHitTarget(geom);
-                    if( log.isTraceEnabled() ) {
-                        log.trace("Hit:" + hit);
+                    if( isTraceEnabled() ) {
+                        trace("Hit:" + hit);
                     }
                     if( hit == null )
                         continue;
@@ -493,7 +561,7 @@ public class PickEventSession {
                         if( hit.getControl(MouseEventControl.class) != null ) {
                             // See if this is one that will take our event
                             if( event == null ) {
-                                event = new MouseMotionEvent((int)cursor.x, (int)cursor.y, 0, 0, 0, 0);
+                                event = new MouseMotionEvent((int)cursor.x, (int)cursor.y, 0, 0, scroll, scrollDelta);
                             }
 
                             hit.getControl(MouseEventControl.class).mouseMoved(event, hit, capture);
@@ -505,7 +573,8 @@ public class PickEventSession {
                         }
 
                         if( hit.getControl(CursorEventControl.class) != null ) {
-                            CursorMotionEvent cme = new CursorMotionEvent(e.viewport, hit, cursor.x, cursor.y, cr);
+                            CursorMotionEvent cme = new CursorMotionEvent(e.viewport, hit, cursor.x, cursor.y, 
+                                                                          scroll, scrollDelta, cr);
                             hit.getControl(CursorEventControl.class).cursorMoved(cme, hit, capture);
 
                             // If the event is consumed then we're done
@@ -514,10 +583,13 @@ public class PickEventSession {
                             }
                         }
 
-                        if( consumed )
+                        if( consumed ) {
                             return true;
+                        }
                     }
                 }
+            } else {
+                trace("No collisions.");
             }
             results.clear();
         }

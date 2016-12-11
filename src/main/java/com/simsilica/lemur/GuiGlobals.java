@@ -43,7 +43,9 @@ import com.simsilica.lemur.style.Styles;
 import com.simsilica.lemur.event.KeyListener;
 import com.simsilica.lemur.event.KeyInterceptState;
 import com.simsilica.lemur.event.MouseAppState;
+import com.simsilica.lemur.event.PopupState;
 import com.simsilica.lemur.focus.FocusManagerState;
+import com.simsilica.lemur.focus.FocusNavigationState;
 import com.jme3.app.Application;
 import com.jme3.asset.AssetManager;
 import com.jme3.asset.TextureKey;
@@ -106,7 +108,9 @@ public class GuiGlobals {
     private MouseAppState mouseState;
     private TouchAppState touchState;
     private FocusManagerState focusState;
+    private FocusNavigationState focusNavState;
     private AnimationState animationState;
+    private PopupState popupState;
     private String iconBase;
 
     private Styles styles;
@@ -142,7 +146,17 @@ public class GuiGlobals {
         
         this.inputMapper = new InputMapper(app.getInputManager());
         this.focusState = new FocusManagerState();
+        this.focusNavState = new FocusNavigationState(inputMapper, focusState);
         this.animationState = new AnimationState();
+        this.popupState = new PopupState();
+
+        // Write the app state dependencies directly so that:
+        // a) they are there before initialization
+        // b) so that the states don't have to rely on GuiGlobals to find
+        //    them.
+        // c) so that we might disable them properly even at runtime
+        //    if the user kills or replaces the nav state
+        focusState.setFocusNavigationState(focusNavState);
         
         app.getStateManager().attach(keyInterceptor);
         
@@ -154,7 +168,9 @@ public class GuiGlobals {
         }
         
         app.getStateManager().attach(focusState);
+        app.getStateManager().attach(focusNavState);
         app.getStateManager().attach(animationState);
+        app.getStateManager().attach(popupState);
 
         styles = new Styles();
         setDefaultStyles();
@@ -178,8 +194,8 @@ public class GuiGlobals {
             java.net.URL u = Resources.getResource("lemur.build.date");
             String build = Resources.toString(u, Charsets.UTF_8);
             log.info("Lemur build date:" + build);
-        } catch( java.io.IOException e ) {
-            log.error( "Error reading build info", e );
+        } catch( Exception e ) {
+            log.error("Error reading build info", e);
         }
     }
 
@@ -212,6 +228,18 @@ public class GuiGlobals {
 
     public AnimationState getAnimationState() {
         return animationState;
+    }
+    
+    public PopupState getPopupState() {
+        return popupState;
+    }
+    
+    public FocusManagerState getFocusManagerState() {
+        return focusState;
+    }
+
+    public FocusNavigationState getFocusNavigationState() {
+        return focusNavState;
     }
 
     /**
@@ -298,6 +326,10 @@ public class GuiGlobals {
         focusState.setFocus(s);
     }
 
+    public Spatial getCurrentFocus() {
+        return focusState.getFocus();
+    }
+
     public void addKeyListener( KeyListener l ) {
         keyInterceptor.addKeyListener(l);
     }
@@ -331,6 +363,9 @@ public class GuiGlobals {
         }
         if( touchState != null ) {
             touchState.setEnabled(f);
+        }
+        if( focusNavState != null ) {
+            focusNavState.setEnabled(f);
         }
     }
 

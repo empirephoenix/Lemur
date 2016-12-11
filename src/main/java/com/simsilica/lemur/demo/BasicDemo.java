@@ -82,7 +82,9 @@ public class BasicDemo extends SimpleApplication {
 
     private ColorRGBA boxColor = ColorRGBA.Blue.clone();
 
-private Panel test;
+    private Panel test;
+    private TextField tf;
+    private String strInsertText = "Inserted ";
 
     public static void main(String[] args) {
         BasicDemo app = new BasicDemo();
@@ -184,7 +186,6 @@ private Panel test;
         // Test text entry
         panel = new Container("glass");
         panel.addChild( new Label( "Test entry:", "glass" ) );
-        panel.addChild( new TextField("", "glass") );
         hudPanel.addChild(panel);
         
         guiNode.attachChild(hudPanel);
