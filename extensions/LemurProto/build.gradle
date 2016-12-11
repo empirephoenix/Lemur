@@ -43,6 +43,15 @@ artifacts {
     archives javadocJar
 }
 
+uploadArchives {
+	repositories {
+		mavenDeployer {
+			repository(url: "$targetRepository/releases") {
+				authentication(userName: targetRepository_user, password: targetRepository_password)
+			}
+		}
+	}
+}
 
 
 // Put this at the end or it won't pick up the project.version and stuff
